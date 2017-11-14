@@ -1,0 +1,43 @@
+#!/bin/bash
+usage(){
+  echo "$(basename $0) <DWI image> <Q minimum> <Q maximum> <Q searching step> [<Histogram bins>]"
+  echo ""
+  echo "Script to find the optimum q value to a determined DWI input."
+  echo "Parameters:"
+  echo "  <DWI image>= A DWI image in nrrd or nhdr file format (readable in ITK EV class)"
+  echo "  <Q minimum>= The minimum value considered to q optimum search."
+  echo "  <Q maximum>= The maximum value considered to q optimum search."
+  echo "  <Q searching step>= The searching step used to change the q value."
+  echo "  <Histogram bins>= The choice of histogram bins estimate, OPTIONS=1 (SQRT),2 (STURGES), 3 (RICE). [OPTIONAL -> Default = Sqrt function]"
+}
+
+if [[ $# -lt 4 ]]; then
+  usage
+  exit 1
+fi
+
+DWI_INPUT=$1
+QMIN=$2
+QMAX=$3
+QSTEP=$4
+
+HIST=1
+if [[ $# == 5 ]]; then
+  HIST=$5
+fi
+
+#Calculating number of searches
+TOTAL_SEARCH=`echo "($QMAX-$QMIN)/$QSTEP" | bc`
+echo "Searching using $TOTAL_SEARCH points, starting from $QMIN to $QMAX (step $QSTEP)"
+
+EV_MAPPING=/home/antonio/Pictures/build-DiffusionEntropyMapping-Desktop-Default/DiffusionEntropyMappingImageFilter
+if [[ ! -e $(dirname $1)/ev_maps_dwi$(basename ${DWI_INPUT%.*})_hist${HIST} ]]; then
+  mkdir $(dirname $1)/ev_maps_dwi$(basename ${DWI_INPUT%.*})_hist${HIST}
+fi
+for (( i = 0; i <= $TOTAL_SEARCH; i++ )); do
+  qTest=`echo "scale=3;($i*$QSTEP)+$QMIN" | bc`
+  echo "-> Performing EV calculation: q = $qTest  -> Saving: $(basename ${DWI_INPUT%.*})_EV_q$qTest.nii.gz"
+  $EV_MAPPING $DWI_INPUT $(dirname $1)/ev_maps_dwi$(basename ${DWI_INPUT%.*})_hist${HIST}/$(basename ${DWI_INPUT%.*})_EV_q$qTest.nii.gz $qTest $HIST
+done
+
+# rm $(dirname $1)/ev_maps_dwi$(basename ${DWI_INPUT%.*})_hist${HIST}
